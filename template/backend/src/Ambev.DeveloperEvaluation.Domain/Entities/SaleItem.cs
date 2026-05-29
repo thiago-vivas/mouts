@@ -36,6 +36,7 @@ public class SaleItem : BaseEntity
 
     public SaleItem(ExternalReference product, int quantity, decimal unitPrice)
     {
+        Id = Guid.NewGuid();
         Product = product;
         UnitPrice = unitPrice;
         SetQuantity(quantity);
