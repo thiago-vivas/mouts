@@ -75,19 +75,24 @@ jobs:
   frontend:
     name: Frontend Build & Test
     runs-on: ubuntu-latest
-    # Only run once the frontend exists (keeps the workflow green on branches/PRs
-    # that don't include src/frontend yet).
-    if: ${{ hashFiles('src/frontend/package-lock.json') != '' }}
-
-    defaults:
-      run:
-        working-directory: src/frontend
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Keeps the job green on branches/PRs that don't include src/frontend yet
+      # (job-level conditionals can't use hashFiles, so detect with a shell test).
+      - name: Detect frontend
+        id: detect
+        run: |
+          if [ -f src/frontend/package-lock.json ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Setup Node 22
+        if: steps.detect.outputs.exists == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -95,12 +100,18 @@ jobs:
           cache-dependency-path: src/frontend/package-lock.json
 
       - name: Install
+        if: steps.detect.outputs.exists == 'true'
+        working-directory: src/frontend
         run: npm ci
 
       - name: Build
+        if: steps.detect.outputs.exists == 'true'
+        working-directory: src/frontend
         run: npm run build
 
       - name: Test
+        if: steps.detect.outputs.exists == 'true'
+        working-directory: src/frontend
         run: npm test
         env:
           CHROME_BIN: /usr/bin/google-chrome
