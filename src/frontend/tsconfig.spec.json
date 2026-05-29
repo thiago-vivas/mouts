@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./dist/out-tsc/spec",
+    "types": ["jasmine"],
+    "baseUrl": ".",
+    "paths": { "*": ["node_modules/*"] }
+  },
+  "include": ["src/**/*.d.ts", "../../tests/frontend/**/*.spec.ts"]
+}
