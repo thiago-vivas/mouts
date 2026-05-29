@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-and-test:
     name: Build & Test
@@ -13,7 +17,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: template/backend
+        working-directory: src/backend
 
     steps:
       - name: Checkout
@@ -23,6 +27,14 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
 
       - name: Restore
         run: dotnet restore Ambev.DeveloperEvaluation.sln
@@ -57,5 +69,38 @@ jobs:
         with:
           name: test-results
           path: |
-            template/backend/coverage/**
+            src/backend/coverage/**
           if-no-files-found: ignore
+
+  frontend:
+    name: Frontend Build & Test
+    runs-on: ubuntu-latest
+    # Only run once the frontend exists (keeps the workflow green on branches/PRs
+    # that don't include src/frontend yet).
+    if: ${{ hashFiles('src/frontend/package-lock.json') != '' }}
+
+    defaults:
+      run:
+        working-directory: src/frontend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: src/frontend/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Test
+        run: npm test
+        env:
+          CHROME_BIN: /usr/bin/google-chrome
