@@ -1,77 +1,240 @@
-# Developer Evaluation Project
+# DeveloperStore — Sales API
 
-`READ CAREFULLY`
+A complete CRUD REST API for **sales records**, built on the provided
+`Ambev.DeveloperEvaluation` .NET 8 template following **DDD** with the
+**External Identities** pattern, quantity-based **discount rules**, and
+**domain events** (logged + persisted to MongoDB).
 
-## Use Case
-**You are a developer on the DeveloperStore team. Now we need to implement the API prototypes.**
+> Supporting challenge docs live in [`.doc/`](.doc/overview.md). **All application
+> code lives under [`template/backend`](template/backend).**
 
-As we work with `DDD`, to reference entities from other domains, we use the `External Identities` pattern with denormalization of entity descriptions.
+---
 
-Therefore, you will write an API (complete CRUD) that handles sales records. The API needs to be able to inform:
+## Contents
+- [Architecture](#architecture)
+- [Tech stack](#tech-stack)
+- [Prerequisites](#prerequisites)
+- [Configure](#configure)
+- [Run](#run)
+- [Test](#test)
+- [API](#api)
+- [Business rules](#business-rules)
+- [Domain events](#domain-events)
+- [Seed data](#seed-data)
+- [Project structure](#project-structure)
 
-* Sale number
-* Date when the sale was made
-* Customer
-* Total sale amount
-* Branch where the sale was made
-* Products
-* Quantities
-* Unit prices
-* Discounts
-* Total amount for each item
-* Cancelled/Not Cancelled
+---
 
-It's not mandatory, but it would be a differential to build code for publishing events of:
-* SaleCreated
-* SaleModified
-* SaleCancelled
-* ItemCancelled
+## Architecture
 
-If you write the code, **it's not required** to actually publish to any Message Broker. You can log a message in the application log or however you find most convenient.
+Layered / Clean architecture with CQRS via MediatR:
 
-### Business Rules
+```
+WebApi  ──>  Application (CQRS handlers) ──> Domain (entities, rules, events)
+  │                                              ▲
+  └──> IoC (DI) ──> ORM (EF Core + Mongo) ───────┘
+```
 
-* Purchases above 4 identical items have a 10% discount
-* Purchases between 10 and 20 identical items have a 20% discount
-* It's not possible to sell above 20 identical items
-* Purchases below 4 items cannot have a discount
+- **Domain** — `Sale` aggregate root, `SaleItem`, `ExternalReference` value object,
+  `DiscountPolicy`, domain events, repository/event-store interfaces. No infra dependencies.
+- **Application** — one feature slice per use case (`Command`/`Query` + `Handler`
+  + `Validator`), AutoMapper profiles, and notification handlers that publish events.
+- **ORM** — EF Core `DefaultContext`, owned-type mappings, `SaleRepository`,
+  `MongoEventStore`, migrations and the data seeder.
+- **WebApi** — `SalesController`, request DTOs, and centralized error handling.
 
-These business rules define quantity-based discounting tiers and limitations:
+The **External Identities** pattern is modeled with the `ExternalReference`
+value object (`{ Id, Name }`): Customer, Branch and Product are referenced by id
+plus a denormalized name — no foreign keys to other aggregates.
 
-1. Discount Tiers:
-   - 4+ items: 10% discount
-   - 10-20 items: 20% discount
+## Tech stack
 
-2. Restrictions:
-   - Maximum limit: 20 items per product
-   - No discounts allowed for quantities below 4 items
+| Concern | Technology |
+|---|---|
+| Runtime | .NET 8 / C# |
+| Web | ASP.NET Core + Swagger |
+| Mediator / CQRS | MediatR |
+| Mapping | AutoMapper |
+| Validation | FluentValidation |
+| Write database | PostgreSQL (EF Core / Npgsql) |
+| Event store | MongoDB |
+| Logging | Serilog |
+| Tests | xUnit, NSubstitute, Bogus (Faker), FluentAssertions |
+| Containers | Docker Compose |
 
-## Overview
-This section provides a high-level overview of the project and the various skills and competencies it aims to assess for developer candidates. 
+## Prerequisites
 
-See [Overview](/.doc/overview.md)
+- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
+- [Docker](https://www.docker.com/) (for PostgreSQL + MongoDB), or local instances
+- `dotnet-ef` tool (only to manage migrations): `dotnet tool install --global dotnet-ef`
 
-## Tech Stack
-This section lists the key technologies used in the project, including the backend, testing, frontend, and database components. 
+All commands below are run from `template/backend`.
 
-See [Tech Stack](/.doc/tech-stack.md)
+## Configure
 
-## Frameworks
-This section outlines the frameworks and libraries that are leveraged in the project to enhance development productivity and maintainability. 
+Connection strings live in
+[`src/Ambev.DeveloperEvaluation.WebApi/appsettings.json`](template/backend/src/Ambev.DeveloperEvaluation.WebApi/appsettings.json):
 
-See [Frameworks](/.doc/frameworks.md)
+```json
+{
+  "ConnectionStrings": {
+    "DefaultConnection": "Host=localhost;Port=5432;Database=developer_evaluation;Username=developer;Password=ev@luAt10n"
+  },
+  "MongoDb": {
+    "ConnectionString": "mongodb://developer:ev%40luAt10n@localhost:27017/?authSource=admin",
+    "Database": "developer_evaluation"
+  }
+}
+```
 
-<!-- 
-## API Structure
-This section includes links to the detailed documentation for the different API resources:
-- [API General](./docs/general-api.md)
-- [Products API](/.doc/products-api.md)
-- [Carts API](/.doc/carts-api.md)
-- [Users API](/.doc/users-api.md)
-- [Auth API](/.doc/auth-api.md)
--->
+These match the credentials in `docker-compose.yml`. MongoDB is optional — if it
+is unreachable the API still runs and events are logged (the event store degrades
+to a no-op).
 
-## Project Structure
-This section describes the overall structure and organization of the project files and directories. 
+## Run
 
-See [Project Structure](/.doc/project-structure.md)
+### Docker databases + local API
+
+```bash
+cd template/backend
+docker-compose up -d ambev.developerevaluation.database ambev.developerevaluation.nosql
+dotnet run --project src/Ambev.DeveloperEvaluation.WebApi
+```
+
+On startup the API **applies EF migrations** and **seeds sample sales**
+automatically. Swagger UI is at `https://localhost:<port>/swagger` (the port is
+printed to the console; see `src/Ambev.DeveloperEvaluation.WebApi/Properties/launchSettings.json`).
+
+### Everything in containers
+
+```bash
+cd template/backend
+docker-compose up -d
+```
+
+## Test
+
+```bash
+cd template/backend
+dotnet test                                                 # all suites (153 tests)
+dotnet test tests/Ambev.DeveloperEvaluation.Unit            # unit only
+dotnet test tests/Ambev.DeveloperEvaluation.Integration     # repository / EF / event store
+dotnet test tests/Ambev.DeveloperEvaluation.Functional      # end-to-end HTTP
+```
+
+Three layers of tests, all runnable without external infrastructure:
+
+- **Unit** (xUnit + NSubstitute + Bogus + FluentAssertions) — discount tiers and
+  boundaries (3/4/9/10/20/21), max-20 rejection, total recalculation, item & sale
+  cancellation, every CQRS handler (mocked repo/mediator), validators, value
+  objects, events and the sale-number generator.
+- **Integration** — `SaleRepository` and the seeder exercised through EF Core
+  (CRUD, owned External-Identity mappings, cascade delete, pagination, filtering,
+  ordering) and the Mongo event store's graceful-degradation path.
+- **Functional** — the real API booted in-memory via `WebApplicationFactory`,
+  driven over HTTP through the full pipeline (routing, validation, MediatR,
+  error middleware, response envelopes) covering the create→get→list→update→
+  cancel lifecycle plus error paths (400/404/domain-rule).
+
+Integration and functional suites run on the EF Core **in-memory provider** so
+they're hermetic in CI and locally (no Docker needed); the identical repository
+code runs on PostgreSQL in production.
+
+### Coverage
+
+```bash
+cd template/backend
+dotnet test Ambev.DeveloperEvaluation.sln --collect:"XPlat Code Coverage" --results-directory ./coverage
+reportgenerator -reports:"coverage/**/coverage.cobertura.xml" -targetdir:coverage/report \
+  -reporttypes:TextSummary -filefilters:"-*Migrations*;-*Designer.cs;-*ModelSnapshot.cs"
+cat coverage/report/Summary.txt
+```
+
+The Sales feature sits at **~98% line coverage**. The small remainder is the
+MongoDB *insert* path (requires a live MongoDB) and defensive guard branches.
+CI runs all three suites and publishes the coverage report as an artifact.
+
+## API
+
+Base route `api/sales`. Responses use the template envelopes
+(`ApiResponseWithData<T>` / `PaginatedResponse<T>`).
+
+| Method | Route | Purpose | Event |
+|---|---|---|---|
+| `POST` | `/api/sales` | Create a sale | `SaleCreated` |
+| `GET` | `/api/sales` | List (paginated/filtered/sorted) | — |
+| `GET` | `/api/sales/{id}` | Get one | — |
+| `PUT` | `/api/sales/{id}` | Update a sale | `SaleModified` |
+| `DELETE` | `/api/sales/{id}` | Delete a sale | — |
+| `PATCH` | `/api/sales/{id}/cancel` | Cancel whole sale | `SaleCancelled` |
+| `PATCH` | `/api/sales/{id}/items/{itemId}/cancel` | Cancel one item | `ItemCancelled` |
+
+**List query parameters** (per [`.doc/general-api.md`](.doc/general-api.md)):
+`_page` (default 1), `_size` (default 10), `_order` (e.g. `"saleDate desc, saleNumber asc"`),
+`customerName`/`branchName` (partial match), `isCancelled`, `_minTotalAmount`/`_maxTotalAmount`.
+
+**Errors** follow the documented `{ type, error, detail }` shape, with mapped
+status codes for validation (400), not found (404) and business-rule
+violations (400).
+
+### Example — create a sale
+
+```bash
+curl -k -X POST https://localhost:5001/api/sales \
+  -H "Content-Type: application/json" \
+  -d '{
+    "saleDate": "2026-05-28T10:00:00Z",
+    "customer": { "id": "11111111-1111-1111-1111-111111111111", "name": "John Doe" },
+    "branch":   { "id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "name": "Downtown Store" },
+    "items": [
+      { "productId": "cccccccc-cccc-cccc-cccc-cccccccccccc", "productName": "Premium Lager 600ml", "quantity": 12, "unitPrice": 8.50 }
+    ]
+  }'
+```
+
+## Business rules
+
+Quantity-based discounts, enforced in the domain (`DiscountPolicy`):
+
+| Identical units | Discount |
+|---|---|
+| 1–3 | 0% |
+| 4–9 | 10% |
+| 10–20 | 20% |
+| > 20 | **rejected** (max 20 per product) |
+
+Discounts are **derived from quantity** — a client cannot send an arbitrary
+discount. Per-item total = `unitPrice * quantity - discount`; sale total = sum of
+active (non-cancelled) item totals.
+
+## Domain events
+
+Published in-process via MediatR notifications. Each event is **logged** (Serilog)
+and **appended to MongoDB** (`sale_events` collection) as an immutable audit
+record. No real message broker is used — this is the allowed alternative to
+publishing to a bus. Events: `SaleCreated`, `SaleModified`, `SaleCancelled`,
+`ItemCancelled`.
+
+## Seed data
+
+On first run (empty `Sales` table) the API seeds four representative sales —
+covering the 0% / 10% / 20% discount tiers, the qty-4 boundary, a 20-unit bulk
+order, and a cancelled sale — with deterministic IDs. See
+[`DbSeeder`](template/backend/src/Ambev.DeveloperEvaluation.ORM/Seeding/DbSeeder.cs).
+
+## Project structure
+
+```
+template/backend/
+├── src/
+│   ├── Ambev.DeveloperEvaluation.Domain         # entities, VOs, rules, events, interfaces
+│   ├── Ambev.DeveloperEvaluation.Application     # CQRS slices, profiles, event handlers
+│   ├── Ambev.DeveloperEvaluation.Common          # validation, logging, security
+│   ├── Ambev.DeveloperEvaluation.ORM             # EF Core, Mongo event store, seeding, migrations
+│   ├── Ambev.DeveloperEvaluation.IoC             # DI module initializers
+│   └── Ambev.DeveloperEvaluation.WebApi          # controllers, DTOs, error handling, Program.cs
+└── tests/
+    ├── Ambev.DeveloperEvaluation.Unit            # domain rules, handlers, validators
+    ├── Ambev.DeveloperEvaluation.Integration
+    └── Ambev.DeveloperEvaluation.Functional
+```
