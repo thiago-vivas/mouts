@@ -1,0 +1,8 @@
+# Angular / Node
+/node_modules
+/dist
+/.angular
+/coverage
+npm-debug.log*
+*.tsbuildinfo
+.DS_Store
