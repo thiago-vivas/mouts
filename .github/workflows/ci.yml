@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: template/backend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore
+        run: dotnet restore Ambev.DeveloperEvaluation.sln
+
+      - name: Build
+        run: dotnet build Ambev.DeveloperEvaluation.sln --configuration Release --no-restore
+
+      - name: Test (unit + integration + functional) with coverage
+        run: >-
+          dotnet test Ambev.DeveloperEvaluation.sln
+          --configuration Release
+          --no-build
+          --logger "trx"
+          --collect:"XPlat Code Coverage"
+          --results-directory ./coverage
+
+      - name: Coverage report
+        if: always()
+        run: |
+          dotnet tool install --global dotnet-reportgenerator-globaltool || true
+          export PATH="$PATH:$HOME/.dotnet/tools"
+          reportgenerator \
+            -reports:"coverage/**/coverage.cobertura.xml" \
+            -targetdir:"coverage/report" \
+            -reporttypes:"TextSummary;Html" \
+            -filefilters:"-*Migrations*;-*Designer.cs;-*ModelSnapshot.cs"
+          cat coverage/report/Summary.txt
+
+      - name: Upload coverage + test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: |
+            template/backend/coverage/**
+          if-no-files-found: ignore
