@@ -18,8 +18,8 @@ npm start        # ng serve → http://localhost:4200
 npm run build    # production build → dist/
 npm test         # Karma + Jasmine unit tests (headless Chrome)
 ```
-The Jasmine specs live at the repo root under `tests/frontend/` (not co-located
-in `src/`); `tsconfig.spec.json` points the test build at them. `npm test` runs them.
+Jasmine specs are co-located with the code they cover (`*.spec.ts` next to each
+service/component, the Angular convention) and run via `npm test` (Karma).
 
 ## Login
 The backend seeds a default user (in non-production): **admin@developerstore.com / Admin@123**.

@@ -2,9 +2,7 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "outDir": "./dist/out-tsc/spec",
-    "types": ["jasmine"],
-    "baseUrl": ".",
-    "paths": { "*": ["node_modules/*"] }
+    "types": ["jasmine"]
   },
-  "include": ["src/**/*.d.ts", "../../tests/frontend/**/*.spec.ts"]
+  "include": ["src/**/*.spec.ts", "src/**/*.d.ts"]
 }

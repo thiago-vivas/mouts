@@ -1,9 +1,9 @@
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { SalesService } from '../../src/frontend/src/app/core/sales.service';
-import { environment } from '../../src/frontend/src/environments/environment';
-import { PaginatedResponse, Sale } from '../../src/frontend/src/app/models/sale.model';
+import { SalesService } from './sales.service';
+import { environment } from '../../environments/environment';
+import { PaginatedResponse, Sale } from '../models/sale.model';
 
 describe('SalesService', () => {
   let service: SalesService;

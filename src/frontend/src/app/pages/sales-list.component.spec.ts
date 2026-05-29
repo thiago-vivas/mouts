@@ -2,8 +2,8 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
-import { SalesListComponent } from '../../src/frontend/src/app/pages/sales-list.component';
-import { environment } from '../../src/frontend/src/environments/environment';
+import { SalesListComponent } from './sales-list.component';
+import { environment } from '../../environments/environment';
 
 describe('SalesListComponent', () => {
   let httpMock: HttpTestingController;
