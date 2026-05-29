@@ -1,0 +1,17 @@
+<Project>
+  <!--
+    NU1903 (AutoMapper 13.0.1 advisory GHSA-rvv3-g6hj-g44x) is acknowledged and
+    suppressed deliberately:
+      * The advisory is an uncontrolled-recursion DoS that only triggers on
+        attacker-controlled, deeply-nested *cyclic* object graphs. Our AutoMapper
+        usage maps shallow, acyclic DTOs (Sale -> SaleItem -> ExternalReference),
+        so it is not exploitable here.
+      * The patched line (AutoMapper 15.1.1+) targets .NET 10 and pulls
+        Microsoft.Extensions.Logging.Abstractions >= 10.0.0, which is incompatible
+        with this .NET 8 solution.
+    Tracked as a documented deviation in the README ("Design decisions").
+  -->
+  <PropertyGroup>
+    <NoWarn>$(NoWarn);NU1903</NoWarn>
+  </PropertyGroup>
+</Project>

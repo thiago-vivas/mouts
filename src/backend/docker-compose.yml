@@ -1,0 +1,77 @@
+services:
+  ambev.developerevaluation.webapi:
+    container_name: ambev_developer_evaluation_webapi
+    image: ${DOCKER_REGISTRY-}ambevdeveloperevaluationwebapi
+    build:
+      context: .
+      dockerfile: src/Ambev.DeveloperEvaluation.WebApi/Dockerfile
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_HTTP_PORTS=8080
+      - ConnectionStrings__DefaultConnection=Host=ambev.developerevaluation.database;Port=5432;Database=developer_evaluation;Username=developer;Password=ev@luAt10n
+      - MongoDb__ConnectionString=mongodb://developer:ev%40luAt10n@ambev.developerevaluation.nosql:27017/?authSource=admin
+      - RabbitMq__ConnectionString=amqp://developer:ev%40luAt10n@ambev.developerevaluation.queue:5672
+    depends_on:
+      ambev.developerevaluation.database:
+        condition: service_healthy
+      ambev.developerevaluation.nosql:
+        condition: service_healthy
+      ambev.developerevaluation.queue:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+
+  ambev.developerevaluation.database:
+    container_name: ambev_developer_evaluation_database
+    image: postgres:13
+
+    environment:
+      POSTGRES_DB: developer_evaluation
+      POSTGRES_USER: developer
+      POSTGRES_PASSWORD: ev@luAt10n
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U developer -d developer_evaluation"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  ambev.developerevaluation.nosql:
+    container_name: ambev_developer_evaluation_nosql
+    image: mongo:8.0
+    environment:
+        MONGO_INITDB_ROOT_USERNAME: developer
+        MONGO_INITDB_ROOT_PASSWORD: ev@luAt10n
+    ports:
+      - "27017:27017"
+    healthcheck:
+      test: ["CMD-SHELL", "echo 'db.runCommand(\"ping\").ok' | mongosh localhost:27017/admin --quiet"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  ambev.developerevaluation.queue:
+    container_name: ambev_developer_evaluation_queue
+    image: rabbitmq:3.13-management
+    environment:
+      RABBITMQ_DEFAULT_USER: developer
+      RABBITMQ_DEFAULT_PASS: ev@luAt10n
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  ambev.developerevaluation.cache:
+    container_name: ambev_developer_evaluation_cache
+    image: redis:7.4.1-alpine
+    command: redis-server --requirepass ev@luAt10n
+    ports:
+       - "6379"
