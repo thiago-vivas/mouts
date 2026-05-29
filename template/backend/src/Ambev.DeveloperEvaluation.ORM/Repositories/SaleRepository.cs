@@ -30,7 +30,14 @@ public class SaleRepository : ISaleRepository
 
     public async Task<Sale> UpdateAsync(Sale sale, CancellationToken cancellationToken = default)
     {
-        _context.Sales.Update(sale);
+        // Callers load the aggregate via GetByIdAsync (tracked) and mutate it, so
+        // the change tracker already holds the correct per-entity states
+        // (added/removed items, modified scalars). Only a detached aggregate needs
+        // an explicit Update — calling Update() on a tracked graph would wrongly
+        // mark newly-added items as Modified.
+        if (_context.Entry(sale).State == EntityState.Detached)
+            _context.Sales.Update(sale);
+
         await _context.SaveChangesAsync(cancellationToken);
         return sale;
     }

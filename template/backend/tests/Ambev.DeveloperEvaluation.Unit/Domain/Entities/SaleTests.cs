@@ -56,6 +56,20 @@ public class SaleTests
         act.Should().Throw<DomainException>();
     }
 
+    [Fact(DisplayName = "Sale total sums only active (non-cancelled) items")]
+    public void Given_SaleWithItems_When_ItemCancelled_Then_TotalExcludesIt()
+    {
+        var sale = NewSale();
+        var item1 = sale.AddItem(Ref("Beer"), 5, 10m);   // total 45
+        var item2 = sale.AddItem(Ref("Water"), 2, 10m);  // total 20
+        sale.TotalAmount.Should().Be(65m);
+
+        sale.CancelItem(item2.Id);
+
+        item2.IsCancelled.Should().BeTrue();
+        sale.TotalAmount.Should().Be(45m);
+    }
+
     [Fact(DisplayName = "Cancelling an already-cancelled item throws")]
     public void Given_CancelledItem_When_CancelAgain_Then_Throws()
     {

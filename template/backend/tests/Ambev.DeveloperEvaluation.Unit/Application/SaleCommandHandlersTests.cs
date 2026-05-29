@@ -38,6 +38,20 @@ public class UpdateSaleHandlerTests
         }
     };
 
+    [Fact(DisplayName = "UpdateSale replaces items, recomputes total and publishes SaleModified")]
+    public async Task Given_ExistingSale_When_Handle_Then_UpdatesAndPublishes()
+    {
+        var sale = SaleTestData.GenerateValidSale();
+        _repository.GetByIdAsync(sale.Id, Arg.Any<CancellationToken>()).Returns(sale);
+
+        var result = await _handler.Handle(ValidCommand(sale.Id), CancellationToken.None);
+
+        result.Customer.Name.Should().Be("New Customer");
+        result.Items.Should().HaveCount(1);
+        result.TotalAmount.Should().Be(28.8m); // 12 * 3 - 20%
+        await _mediator.Received(1).Publish(Arg.Any<SaleModifiedEvent>(), Arg.Any<CancellationToken>());
+    }
+
     [Fact(DisplayName = "UpdateSale throws when the sale does not exist")]
     public async Task Given_MissingSale_When_Handle_Then_Throws()
     {
@@ -133,6 +147,19 @@ public class CancelSaleItemHandlerTests
     {
         _handler = new CancelSaleItemHandler(_repository, TestData.SalesMapper.Create(), _mediator);
         _repository.UpdateAsync(Arg.Any<Sale>(), Arg.Any<CancellationToken>()).Returns(ci => ci.Arg<Sale>());
+    }
+
+    [Fact(DisplayName = "CancelSaleItem cancels the item and publishes ItemCancelled")]
+    public async Task Given_ExistingItem_When_Handle_Then_CancelsAndPublishes()
+    {
+        var sale = SaleTestData.GenerateValidSale(itemCount: 2);
+        var itemId = sale.Items.First().Id;
+        _repository.GetByIdAsync(sale.Id, Arg.Any<CancellationToken>()).Returns(sale);
+
+        var result = await _handler.Handle(new CancelSaleItemCommand(sale.Id, itemId), CancellationToken.None);
+
+        result.Items.Single(i => i.Id == itemId).IsCancelled.Should().BeTrue();
+        await _mediator.Received(1).Publish(Arg.Any<ItemCancelledEvent>(), Arg.Any<CancellationToken>());
     }
 
     [Fact(DisplayName = "CancelSaleItem throws when the sale does not exist")]

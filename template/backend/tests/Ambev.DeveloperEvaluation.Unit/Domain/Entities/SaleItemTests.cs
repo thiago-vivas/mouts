@@ -9,6 +9,12 @@ public class SaleItemTests
 {
     private static ExternalReference Product() => new(Guid.NewGuid(), "Product");
 
+    [Fact(DisplayName = "New item gets a non-empty client-generated id")]
+    public void Given_NewItem_Then_HasId()
+    {
+        new SaleItem(Product(), 1, 10m).Id.Should().NotBe(Guid.Empty);
+    }
+
     [Fact(DisplayName = "Changing unit price recomputes discount and total")]
     public void Given_Item_When_UnitPriceChanged_Then_Recomputes()
     {

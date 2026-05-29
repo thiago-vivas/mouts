@@ -12,7 +12,10 @@ public class SaleConfiguration : IEntityTypeConfiguration<Sale>
         builder.ToTable("Sales");
 
         builder.HasKey(s => s.Id);
-        builder.Property(s => s.Id).HasColumnType("uuid").HasDefaultValueSql("gen_random_uuid()");
+        // IDs are generated client-side (in the entity constructors), so the key is
+        // not store-generated. This keeps EF's add/update state detection correct
+        // when the aggregate graph is mutated (e.g. replacing items on update).
+        builder.Property(s => s.Id).HasColumnType("uuid").ValueGeneratedNever();
 
         builder.Property(s => s.SaleNumber).IsRequired().HasMaxLength(30);
         builder.HasIndex(s => s.SaleNumber).IsUnique();
